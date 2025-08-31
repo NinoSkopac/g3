@@ -17,6 +17,8 @@ pub(crate) struct UsernameParamsToEscaperConfig {
     pub(crate) keys_for_host: Vec<String>,
     /// require that if a later key appears, all its ancestors (earlier keys) must also appear
     pub(crate) require_hierarchy: bool,
+    /// keys that can appear independently without requiring earlier keys (e.g., a generic optional key)
+    pub(crate) floating_keys: Vec<String>,
     /// reject unknown keys not present in `keys_for_host`
     pub(crate) reject_unknown_keys: bool,
     /// reject duplicate keys
@@ -41,6 +43,7 @@ impl UsernameParamsToEscaperConfig {
             position,
             keys_for_host: Vec::new(),
             require_hierarchy: true,
+            floating_keys: Vec::new(),
             reject_unknown_keys: true,
             reject_duplicate_keys: true,
             separator: "-".to_string(),
@@ -72,6 +75,11 @@ impl UsernameParamsToEscaperConfig {
             }
             "reject_unknown_keys" => {
                 self.reject_unknown_keys = g3_yaml::value::as_bool(v)?;
+                Ok(())
+            }
+            "floating_keys" | "floating" => {
+                self.floating_keys = g3_yaml::value::as_list(v, |v| g3_yaml::value::as_string(v))
+                    .context(format!("invalid string list value for key {k}"))?;
                 Ok(())
             }
             "reject_duplicate_keys" => {
@@ -118,6 +126,12 @@ impl UsernameParamsToEscaperConfig {
         }
         if self.separator.is_empty() {
             return Err(anyhow!("separator must not be empty"));
+        }
+        // ensure floating keys are included in keys_for_host
+        for fk in &self.floating_keys {
+            if !self.keys_for_host.iter().any(|k| k == fk) {
+                return Err(anyhow!("floating key {fk} must be listed in keys_for_host"));
+            }
         }
         Ok(())
     }

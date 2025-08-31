@@ -88,21 +88,28 @@ pub(crate) fn compute_upstream_from_username(
     }
 
     if cfg.require_hierarchy {
-        // if a later key appears, all earlier ones must be present
-        let mut saw_missing_ancestor = false;
+        // if a later non-floating key appears, all earlier non-floating must be present
+        let mut saw_missing_required = false;
         for key in &cfg.keys_for_host {
-            if let Some(_v) = parsed.params.get(key) {
-                if saw_missing_ancestor {
-                    debug!(
-                        "username-params: hierarchy violation at key '{}'", key
-                    );
-                    return Err(anyhow!(
-                        "key {key} requires its ancestor keys to be present"
-                    ));
+            let is_floating = cfg.floating_keys.iter().any(|k| k == key);
+            match parsed.params.get(key) {
+                Some(_v) => {
+                    if saw_missing_required && !is_floating {
+                        debug!(
+                            "username-params: hierarchy violation at key '{}' (floating={})",
+                            key, is_floating
+                        );
+                        return Err(anyhow!(
+                            "key {key} requires its ancestor keys to be present"
+                        ));
+                    }
                 }
-            } else {
-                // mark that following present keys will violate hierarchy
-                saw_missing_ancestor = true;
+                None => {
+                    if !is_floating {
+                        // mark that following present required keys will violate hierarchy
+                        saw_missing_required = true;
+                    }
+                }
             }
         }
     }
@@ -115,8 +122,8 @@ pub(crate) fn compute_upstream_from_username(
         }
     }
     debug!(
-        "username-params: keys_for_host={:?} used_parts={:?}",
-        cfg.keys_for_host, parts
+        "username-params: keys_for_host={:?} floating_keys={:?} used_parts={:?}",
+        cfg.keys_for_host, cfg.floating_keys, parts
     );
 
     let port = match inbound {
@@ -183,6 +190,7 @@ mod tests {
         c.keys_for_host = keys.iter().map(|s| s.to_string()).collect();
         c.require_hierarchy = true;
         c.reject_unknown_keys = true;
+        c.floating_keys = Vec::new();
         c.global_label = "global".to_string();
         c.http_port = 10000;
         c.socks5_port = 10001;
@@ -281,5 +289,52 @@ mod tests {
             Host::Domain(d) => assert_eq!(d.as_ref(), "foo.svc.local"),
             _ => panic!("expected domain host"),
         }
+    }
+
+    #[test]
+    fn compute_with_floating_optional() {
+        // label order: label1, label2, label3, label4, opt; opt is floating (independent)
+        let mut cfg = cfg_with_keys(&["label1", "label2", "label3", "label4", "opt"]);
+        cfg.floating_keys = vec!["opt".to_string()];
+
+        // opt only
+        let ups = compute_upstream_from_username(&cfg, "user+opt=o123", InboundKind::Http)
+            .unwrap();
+        match ups.host() {
+            Host::Domain(d) => assert_eq!(d.as_ref(), "o123"),
+            _ => panic!("expected domain host"),
+        }
+
+        // label1 + opt
+        let ups = compute_upstream_from_username(
+            &cfg,
+            "user+label1=foo+opt=o123",
+            InboundKind::Http,
+        )
+        .unwrap();
+        match ups.host() {
+            Host::Domain(d) => assert_eq!(d.as_ref(), "foo-o123"),
+            _ => panic!("expected domain host"),
+        }
+
+        // full hierarchy + opt
+        let ups = compute_upstream_from_username(
+            &cfg,
+            "user+label1=foo+label2=bar+label3=baz+label4=qux+opt=o123",
+            InboundKind::Http,
+        )
+        .unwrap();
+        match ups.host() {
+            Host::Domain(d) => assert_eq!(d.as_ref(), "foo-bar-baz-qux-o123"),
+            _ => panic!("expected domain host"),
+        }
+
+        // label2 without label1 (still invalid), even if opt present
+        assert!(compute_upstream_from_username(
+            &cfg,
+            "user+label2=bar+opt=o123",
+            InboundKind::Http,
+        )
+        .is_err());
     }
 }
