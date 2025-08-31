@@ -72,6 +72,15 @@ resolver:
     type: c-ares
 
 escaper:
+  # NOTE ABOUT proxy_addr BELOW
+  # - proxy_addr is required by proxy_* escapers so they can initialize.
+  # - In this example, the next-hop is computed from the username params per connection,
+  #   so these proxy_addr values are placeholders and are NOT used when params are present.
+  # - If you want a meaningful fallback (e.g., when no username params are supplied
+  #   and you allow anonymous), set proxy_addr to your actual default next-hop, e.g.:
+  #     HTTP  -> 127.0.0.1:10000
+  #     SOCKS -> 127.0.0.1:10001
+
   # HTTP chaining escaper; overridden per-connection by computed host:port
   - name: dyn_http_chain
     type: proxy_http

@@ -369,6 +369,12 @@ Behavior:
 - Username `user+label1=foo+label2=bar` → host `foo-bar`, port `10000` for HTTP inbound.
 - Invalid params cause HTTP 400 Bad Request; SOCKS5 replies with a standard error code and denies the request.
 
+Escaper fallback note:
+- Proxy chaining escapers (proxy_http/proxy_socks5/…) must define at least one `proxy_addr` to initialize.
+- When username params are present (and auth succeeds), the computed host:port overrides `proxy_addr` for that connection.
+- If you want a real fallback for requests without username params (e.g., anonymous), set `proxy_addr` to your default next‑hop
+  (for this example: HTTP → 127.0.0.1:10000, SOCKS5 → 127.0.0.1:10001). Otherwise the placeholder values are never used.
+
 ### Connection Throttling
 
 All servers, escapers, users support per-connection throttling. Set the same key in the corresponding server &

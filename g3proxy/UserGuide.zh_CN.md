@@ -346,6 +346,12 @@ server:
 - 用户名 `user+label1=foo+label2=bar` → 主机 `foo-bar`，HTTP 入站端口 `10000`。
 - 非法参数（未知键或层级违例）会导致 HTTP 返回 400 Bad Request；SOCKS5 返回标准错误码并拒绝请求。
 
+出口回退说明：
+- 代理串联出口（proxy_http / proxy_socks5 / …）在初始化时必须配置至少一个 `proxy_addr`。
+- 当用户名参数存在且认证成功时，计算得到的 host:port 会覆盖该连接的 `proxy_addr`。
+- 如果希望对“未提供用户名参数”的请求提供真实回退路径（例如允许匿名），请将 `proxy_addr` 设置为默认下一跳
+  （本示例可用：HTTP → 127.0.0.1:10000，SOCKS5 → 127.0.0.1:10001）。否则示例中的占位值不会被使用。
+
 ### 连接限速
 
 server、escaper、user维度均支持设置单连接限速，配置key相同，在对应的server & escaper & user里设置：
