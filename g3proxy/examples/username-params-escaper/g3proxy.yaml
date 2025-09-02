@@ -2,7 +2,7 @@
 # Minimal end-to-end example: derive next-hop escaper address from proxy username params.
 #
 # Highlights
-# - HTTP server on 8080 and SOCKS5 server on 11080
+# - HTTP server on 13128 and SOCKS5 server on 11080
 # - Username format: base+key1=val1+key2=val2
 # - Keys are ordered and optional; hierarchy can be enforced (child requires parent)
 # - Computed service host = join(values, '-') or 'global' when no params
@@ -19,7 +19,7 @@ user_group:
         #     md5:  <hex>
         #     sha1: <hex>
         # Or:
-        #   token: "$6$mysalt$..."   # xcrypt/sha-512
+        #   token: "$6$mysalt$..."
         token: ~
 
 server:
@@ -39,7 +39,10 @@ server:
       reject_unknown_keys: true
       reject_duplicate_keys: true
       separator: "-"
-      domain_suffix: ".localhost"   # for local testing; resolves to 127.0.0.1
+      # for local testing use ".localhost"
+      # k8s note: c-ares doesn't expand ndots
+      # so use FQDN (e.g. domain_suffix: ".default.svc.cluster.local")
+      domain_suffix: ".localhost"
       global_label: "global"
       http_port: 10000
       socks5_port: 10001
@@ -61,7 +64,10 @@ server:
       reject_unknown_keys: true
       reject_duplicate_keys: true
       separator: "-"
-      domain_suffix: ".localhost"   # for local testing; resolves to 127.0.0.1
+      # for local testing use ".localhost"
+      # k8s note: c-ares doesn't expand ndots
+      # so use FQDN (e.g. domain_suffix: ".default.svc.cluster.local")
+      domain_suffix: ".localhost"
       global_label: "global"
       http_port: 10000
       socks5_port: 10001
